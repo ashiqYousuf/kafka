@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/ashiqYousuf/kafka/internal/config"
@@ -20,8 +21,8 @@ var (
 type IKafkaAdmin interface {
 	CreateTopic(topic string, detail *sarama.TopicDetail, validateOnly bool) error
 	ListTopics() (map[string]sarama.TopicDetail, error)
-	// DescribeTopics(topics []string) (metadata []*sarama.TopicMetadata, err error)
-	// DeleteTopic(topic string) error
+	DeleteTopic(topic string) error
+	AlterConfig(resourceType sarama.ConfigResourceType, name string, entries map[string]*string, validateOnly bool) error
 	Close() error
 }
 
@@ -87,29 +88,49 @@ func (a *KafkaAdmin) CreateTopic(ctx context.Context, topic *Topic) error {
 		return err
 	}
 
+	time.Sleep(time.Millisecond * 1000) // to propagate the topic creation
 	logger.Logger(ctx).Info("kafka.admin: topic created successfully", zap.String(constants.TOPIC_NAME, topic.Name))
 	return nil
 }
 
 func (a *KafkaAdmin) ListTopics(ctx context.Context) (map[string]sarama.TopicDetail, error) {
-	return a.client.ListTopics()
+	topicDetailMap, err := a.client.ListTopics()
+	if err != nil {
+		logger.Logger(ctx).Error(
+			"kafka.admin: unable to list topics",
+			zap.Error(err),
+		)
+		return nil, err
+	}
+	return topicDetailMap, nil
 }
 
-func (a *KafkaAdmin) buildTopicDetail(topic *Topic) *sarama.TopicDetail {
-	cfgEntries := map[string]*string{}
-	for k, v := range topic.ExtraParams {
-		cfgEntries[k] = ptr(v)
+func (a *KafkaAdmin) DeleteTopic(ctx context.Context, topic string) error {
+	err := a.client.DeleteTopic(topic)
+	if err != nil {
+		logger.Logger(ctx).Error(
+			"kafka.admin: unable to delete topic",
+			zap.String(constants.TOPIC_NAME, topic),
+			zap.Error(err),
+		)
 	}
 
-	return &sarama.TopicDetail{
-		NumPartitions:     int32(topic.NumPartitions),
-		ReplicationFactor: int16(topic.ReplicationFactor),
-		ConfigEntries:     cfgEntries,
-	}
+	logger.Logger(ctx).Info("topic deleted successfully", zap.String(constants.TOPIC_NAME, topic))
+	return nil
 }
 
-func ptr(str string) *string {
-	return &str
+func (a *KafkaAdmin) AlterTopicConfig(ctx context.Context, topic *Topic) error {
+	err := a.client.AlterConfig(sarama.TopicResource, topic.Name, a.buildConfigEntries(topic), false)
+	if err != nil {
+		logger.Logger(ctx).Error(
+			"kafka.admin: unable to update topic",
+			zap.String(constants.TOPIC_NAME, topic.Name),
+			zap.Error(err),
+		)
+	}
+
+	logger.Logger(ctx).Info("topic updated successfully", zap.String(constants.TOPIC_NAME, topic.Name))
+	return nil
 }
 
 // Close helps to release sockets & resources
@@ -118,4 +139,24 @@ func (a *KafkaAdmin) Close() error {
 		return nil
 	}
 	return a.client.Close()
+}
+
+func (a *KafkaAdmin) buildTopicDetail(topic *Topic) *sarama.TopicDetail {
+	return &sarama.TopicDetail{
+		NumPartitions:     int32(topic.NumPartitions),
+		ReplicationFactor: int16(topic.ReplicationFactor),
+		ConfigEntries:     a.buildConfigEntries(topic),
+	}
+}
+
+func (a *KafkaAdmin) buildConfigEntries(topic *Topic) map[string]*string {
+	cfgEntries := map[string]*string{}
+	for k, v := range topic.ExtraParams {
+		cfgEntries[k] = ptr(v)
+	}
+	return cfgEntries
+}
+
+func ptr(str string) *string {
+	return &str
 }

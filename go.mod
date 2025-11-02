@@ -6,6 +6,7 @@ toolchain go1.24.9
 
 require (
 	github.com/IBM/sarama v1.46.3
+	github.com/google/uuid v1.6.0
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
