@@ -2,6 +2,7 @@ package constants
 
 // TODO: better naming
 const (
+	PORT                               = "port"
 	APP_NAME                           = "kafka"
 	TOPIC_NAME                         = "topic_name"
 	MSG_KEY                            = "key"
