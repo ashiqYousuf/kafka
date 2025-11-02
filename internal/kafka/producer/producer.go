@@ -12,25 +12,33 @@ import (
 	"go.uber.org/zap"
 )
 
+/*
+	1. SyncProducer: Sends operation → waits for Kafka ack
+	2. AsyncProducer: Queues → background works send later
+	3. async model wins for high throughput.
+	4. You don’t directly communicate with Kafka — you enqueue messages to Sarama’s internal system.
+	5. Sarama’s goroutines handle networking, batching, retries.
+	6. You must consume Successes/Errors to keep flow non-blocking.
+	7. Successes() is a channel of successful deliveries
+	8. Errors() is a channel of failed deliveries
+	9. If you don’t read from them, they fill up
+	10. This is why we spin 2 goroutines — one to drain Successes, one for Errors
+*/
+
 var (
 	producerClient *Producer
 	once           sync.Once
 )
 
 type IKafkaProducer interface {
-	// methods... Close Input testable ones only
+	Close() error
+	Input() chan<- *sarama.ProducerMessage
+	Successes() <-chan *sarama.ProducerMessage
+	Errors() <-chan *sarama.ProducerError
 }
 
 type Producer struct {
-	/*
-		1. SyncProducer: Sends operation → waits for Kafka ack
-		2. AsyncProducer: Queues → background works send later
-		3. async model wins for high throughput.
-		4. You don’t directly communicate with Kafka — you enqueue messages to Sarama’s internal system.
-		5. Sarama’s goroutines handle networking, batching, retries.
-		6. You must consume Successes/Errors to keep flow non-blocking.
-	*/
-	client sarama.AsyncProducer
+	client IKafkaProducer
 }
 
 func InitProducerClient(ctx context.Context) error {
@@ -71,11 +79,6 @@ func InitProducerClient(ctx context.Context) error {
 			client: client,
 		}
 
-		// client.Successes() is a channel of successful deliveries
-		// client.Errors() is a channel of failed deliveries
-		// If you don’t read from them, they fill up
-		// This is why we spin 2 goroutines — one to drain Successes, one for Errors
-
 		go producerClient.handleSuccesses()
 		go producerClient.handleErrors()
 
@@ -89,6 +92,13 @@ func GetProducerClient() *Producer {
 		return &Producer{}
 	}
 	return producerClient
+}
+
+// SetProducerClient used for testing only
+func SetProducerClient(mockClient IKafkaProducer) {
+	producerClient = &Producer{
+		client: mockClient,
+	}
 }
 
 func (p *Producer) Send(ctx context.Context, topic, key string, value []byte) {
