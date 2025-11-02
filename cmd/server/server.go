@@ -41,7 +41,7 @@ func kafkaAdminOps(ctx context.Context) {
 	}
 }
 
-func createTopics(ctx context.Context, kafkaAdminClient *admin.KafkaAdmin) error {
+func createTopics(ctx context.Context, kafkaAdminClient *admin.KafkaAdminClient) error {
 	topics := make([]*admin.Topic, 0)
 	topics = append(topics, admin.GetUserTopic())
 	for _, topic := range topics {
@@ -56,7 +56,7 @@ func createTopics(ctx context.Context, kafkaAdminClient *admin.KafkaAdmin) error
 }
 
 // deleteUpdateTopic has no use as of now
-func deleteUpdateTopic(ctx context.Context, kafkaAdminClient *admin.KafkaAdmin) {
+func deleteUpdateTopic(ctx context.Context, kafkaAdminClient *admin.KafkaAdminClient) {
 	// Update topic
 	topic := admin.GetUserTopic()
 	topic.ExtraParams[constants.MIN_INSYNC_REPLICAS] = "3"

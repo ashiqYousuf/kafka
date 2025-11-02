@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	adminClient *KafkaAdmin
+	adminClient *KafkaAdminClient
 	once        sync.Once
 )
 
@@ -26,18 +26,21 @@ type IKafkaAdmin interface {
 	Close() error
 }
 
-type KafkaAdmin struct {
+type KafkaAdminClient struct {
 	client IKafkaAdmin
 }
 
-func GetKafkaAdminClient() *KafkaAdmin {
-	return adminClient
+func GetKafkaAdminClient() *KafkaAdminClient {
+	if adminClient != nil {
+		return adminClient
+	}
+	return &KafkaAdminClient{}
 }
 
 // SetKafkaAdminClient to be used for testing only
 func SetKafkaAdminClient(mockClient IKafkaAdmin) {
 	// mockClient will implement all methods of IKafkaAdmin
-	adminClient = &KafkaAdmin{
+	adminClient = &KafkaAdminClient{
 		client: mockClient,
 	}
 }
@@ -63,7 +66,7 @@ func InitKafkaAdminClient(ctx context.Context) error {
 			clientError = err
 			return
 		}
-		adminClient = &KafkaAdmin{
+		adminClient = &KafkaAdminClient{
 			client: client, // client (sarama.ClusterAdmin) already has implements IKafkaAdmin
 		}
 		logger.Logger(ctx).Info("kafka.admin kafka admin client initialized successfully")
@@ -72,7 +75,7 @@ func InitKafkaAdminClient(ctx context.Context) error {
 	return clientError
 }
 
-func (a *KafkaAdmin) CreateTopic(ctx context.Context, topic *Topic) error {
+func (a *KafkaAdminClient) CreateTopic(ctx context.Context, topic *Topic) error {
 	topicDetail := a.buildTopicDetail(topic)
 	err := a.client.CreateTopic(topic.Name, topicDetail, false)
 	if err != nil {
@@ -93,7 +96,7 @@ func (a *KafkaAdmin) CreateTopic(ctx context.Context, topic *Topic) error {
 	return nil
 }
 
-func (a *KafkaAdmin) ListTopics(ctx context.Context) (map[string]sarama.TopicDetail, error) {
+func (a *KafkaAdminClient) ListTopics(ctx context.Context) (map[string]sarama.TopicDetail, error) {
 	topicDetailMap, err := a.client.ListTopics()
 	if err != nil {
 		logger.Logger(ctx).Error(
@@ -105,7 +108,7 @@ func (a *KafkaAdmin) ListTopics(ctx context.Context) (map[string]sarama.TopicDet
 	return topicDetailMap, nil
 }
 
-func (a *KafkaAdmin) DeleteTopic(ctx context.Context, topic string) error {
+func (a *KafkaAdminClient) DeleteTopic(ctx context.Context, topic string) error {
 	err := a.client.DeleteTopic(topic)
 	if err != nil {
 		logger.Logger(ctx).Error(
@@ -113,13 +116,14 @@ func (a *KafkaAdmin) DeleteTopic(ctx context.Context, topic string) error {
 			zap.String(constants.TOPIC_NAME, topic),
 			zap.Error(err),
 		)
+		return err
 	}
 
 	logger.Logger(ctx).Info("topic deleted successfully", zap.String(constants.TOPIC_NAME, topic))
 	return nil
 }
 
-func (a *KafkaAdmin) AlterTopicConfig(ctx context.Context, topic *Topic) error {
+func (a *KafkaAdminClient) AlterTopicConfig(ctx context.Context, topic *Topic) error {
 	err := a.client.AlterConfig(sarama.TopicResource, topic.Name, a.buildConfigEntries(topic), false)
 	if err != nil {
 		logger.Logger(ctx).Error(
@@ -127,6 +131,7 @@ func (a *KafkaAdmin) AlterTopicConfig(ctx context.Context, topic *Topic) error {
 			zap.String(constants.TOPIC_NAME, topic.Name),
 			zap.Error(err),
 		)
+		return err
 	}
 
 	logger.Logger(ctx).Info("topic updated successfully", zap.String(constants.TOPIC_NAME, topic.Name))
@@ -134,14 +139,14 @@ func (a *KafkaAdmin) AlterTopicConfig(ctx context.Context, topic *Topic) error {
 }
 
 // Close helps to release sockets & resources
-func (a *KafkaAdmin) Close() error {
+func (a *KafkaAdminClient) Close() error {
 	if a == nil || a.client == nil {
 		return nil
 	}
 	return a.client.Close()
 }
 
-func (a *KafkaAdmin) buildTopicDetail(topic *Topic) *sarama.TopicDetail {
+func (a *KafkaAdminClient) buildTopicDetail(topic *Topic) *sarama.TopicDetail {
 	return &sarama.TopicDetail{
 		NumPartitions:     int32(topic.NumPartitions),
 		ReplicationFactor: int16(topic.ReplicationFactor),
@@ -149,7 +154,7 @@ func (a *KafkaAdmin) buildTopicDetail(topic *Topic) *sarama.TopicDetail {
 	}
 }
 
-func (a *KafkaAdmin) buildConfigEntries(topic *Topic) map[string]*string {
+func (a *KafkaAdminClient) buildConfigEntries(topic *Topic) map[string]*string {
 	cfgEntries := map[string]*string{}
 	for k, v := range topic.ExtraParams {
 		cfgEntries[k] = ptr(v)
