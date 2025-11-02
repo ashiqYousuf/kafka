@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 
+	"github.com/ashiqYousuf/kafka/internal/config"
 	"github.com/ashiqYousuf/kafka/internal/kafka/admin"
+	"github.com/ashiqYousuf/kafka/internal/kafka/producer"
 	"github.com/ashiqYousuf/kafka/pkg/constants"
 	"github.com/ashiqYousuf/kafka/pkg/logger"
 	"github.com/ashiqYousuf/kafka/pkg/utils"
@@ -18,7 +20,28 @@ func Start() {
 		logger.Logger(ctx).Fatal("kafka init error", zap.Error(err))
 	}
 
-	kafkaAdminOps(ctx)
+	if !config.GetConfig().KafkaConfig.DisableTopicCreation {
+		kafkaAdminOps(ctx)
+	}
+
+	producer.InitProducerClient(ctx)
+	// producer := producer.GetProducerClient()
+
+	// type user struct {
+	// 	Id   int32
+	// 	Name string
+	// 	Addr string
+	// }
+	// users := []*user{
+	// 	{Id: 1, Name: "User1", Addr: "Ok"},
+	// 	{Id: 2, Name: "User2", Addr: "Boh"},
+	// 	{Id: 3, Name: "User3", Addr: "HT"},
+	// }
+
+	// for _, u := range users {
+	// 	d, _ := json.Marshal(u)
+	// 	producer.Send(ctx, config.GetConfig().KafkaConfig.KafkaUserTopic.TopicName, string(u.Id), d)
+	// }
 }
 
 func kafkaAdminOps(ctx context.Context) {

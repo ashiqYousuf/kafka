@@ -19,12 +19,13 @@ type ServiceConfig struct {
 }
 
 type KafkaConfig struct {
-	KafkaBrokers      []string
-	KafkaVersion      string
-	AdminRetryCount   int           // If fetching metadata (like broker list or topic info) fails, it retries up to 5 times before giving up.
-	AdminTimeout      time.Duration // Controls how long admin operations can block before timing out
-	AdminRetryBackOff time.Duration
-	KafkaUserTopic    *KafkaTopic
+	KafkaBrokers         []string
+	KafkaVersion         string
+	AdminRetryCount      int           // If fetching metadata (like broker list or topic info) fails, it retries up to 5 times before giving up.
+	AdminTimeout         time.Duration // Controls how long admin operations can block before timing out
+	AdminRetryBackOff    time.Duration
+	DisableTopicCreation bool
+	KafkaUserTopic       *KafkaTopic
 }
 
 type KafkaTopic struct {
@@ -47,11 +48,12 @@ type LogConfig struct {
 func GetConfig() *Config {
 	return &Config{
 		KafkaConfig: &KafkaConfig{
-			KafkaBrokers:      viper.GetStringSlice("KAFKA_BROKER_URLS"),
-			KafkaVersion:      viper.GetString("KAFKA_VERSION"),
-			AdminRetryCount:   viper.GetInt("KAFKA_ADMIN_RETRY_COUNT"),
-			AdminRetryBackOff: viper.GetDuration("KAFKA_ADMIN_RETRY_BACKOFF") * time.Millisecond,
-			AdminTimeout:      viper.GetDuration("KAFKA_ADMIN_TIMEOUT") * time.Second,
+			KafkaBrokers:         viper.GetStringSlice("KAFKA_BROKER_URLS"),
+			KafkaVersion:         viper.GetString("KAFKA_VERSION"),
+			AdminRetryCount:      viper.GetInt("KAFKA_ADMIN_RETRY_COUNT"),
+			AdminRetryBackOff:    viper.GetDuration("KAFKA_ADMIN_RETRY_BACKOFF") * time.Millisecond,
+			AdminTimeout:         viper.GetDuration("KAFKA_ADMIN_TIMEOUT") * time.Second,
+			DisableTopicCreation: viper.GetBool("KAFKA_DISABLE_TOPIC_CREATION"),
 			KafkaUserTopic: &KafkaTopic{
 				TopicName:     viper.GetString("KAFKA_USER_TOPIC"),
 				NumPartitions: viper.GetInt32("KAFKA_USER_NUM_PARTITIONS"),
@@ -84,6 +86,7 @@ func init() {
 	viper.Set("KAFKA_ADMIN_RETRY_COUNT", 5)
 	viper.Set("KAFKA_ADMIN_RETRY_BACKOFF", 500)
 	viper.Set("KAFKA_ADMIN_TIMEOUT", 60)
+	viper.Set("KAFKA_DISABLE_TOPIC_CREATION", false)
 
 	viper.Set("KAFKA_USER_TOPIC", "user_created")
 	viper.Set("KAFKA_USER_NUM_PARTITIONS", 3)

@@ -1,8 +1,13 @@
 package constants
 
+// TODO: better naming
 const (
 	APP_NAME                           = "kafka"
 	TOPIC_NAME                         = "topic_name"
+	MSG_KEY                            = "key"
+	MSG_VALUE                          = "value"
+	MSG_OFFSET                         = "offset"
+	MSG_PARTITION                      = "partition"
 	TOPIC_DETAIL                       = "topic_detail"
 	MIN_INSYNC_REPLICAS                = "min.insync.replicas"
 	CLEANUP_POLICY                     = "cleanup.policy"
