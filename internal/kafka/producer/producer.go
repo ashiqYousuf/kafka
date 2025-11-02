@@ -131,6 +131,7 @@ func (p *Producer) handleErrors() {
 			zap.String(constants.MSG_VALUE, value),
 			zap.Error(producerErr.Err),
 		)
+		// Emit metrics or use DLQ
 	}
 }
 
