@@ -26,6 +26,7 @@ type KafkaConfig struct {
 	AdminRetryBackOff    time.Duration
 	DisableTopicCreation bool
 	KafkaUserTopic       *KafkaTopic
+	KafkaConsumerConfig  *KafkaConsumerConfig
 }
 
 type KafkaTopic struct {
@@ -33,6 +34,11 @@ type KafkaTopic struct {
 	NumPartitions int32
 	DefaultRF     int16
 	ExtraParams   map[string]string
+}
+
+type KafkaConsumerConfig struct {
+	GroupID string
+	Topics  []string
 }
 
 type LogConfig struct {
@@ -59,6 +65,10 @@ func GetConfig() *Config {
 				NumPartitions: viper.GetInt32("KAFKA_USER_NUM_PARTITIONS"),
 				DefaultRF:     int16(viper.GetInt32("KAFKA_USER_RF")),
 				ExtraParams:   viper.GetStringMapString("KAFKA_USER_EXTRA_PARAMS"),
+			},
+			KafkaConsumerConfig: &KafkaConsumerConfig{
+				GroupID: viper.GetString("KAFKA_CONSUMER_GROUP_ID"),
+				Topics:  viper.GetStringSlice("KAFKA_CONSUMER_TOPICS"),
 			},
 		},
 		LogConfig: &LogConfig{
@@ -87,6 +97,8 @@ func init() {
 	viper.Set("KAFKA_ADMIN_RETRY_BACKOFF", 500)
 	viper.Set("KAFKA_ADMIN_TIMEOUT", 60)
 	viper.Set("KAFKA_DISABLE_TOPIC_CREATION", false)
+	viper.Set("KAFKA_CONSUMER_GROUP_ID", "cg-1")
+	viper.Set("KAFKA_CONSUMER_TOPICS", []string{"user_created"})
 
 	viper.Set("KAFKA_USER_TOPIC", "user_created")
 	viper.Set("KAFKA_USER_NUM_PARTITIONS", 3)
