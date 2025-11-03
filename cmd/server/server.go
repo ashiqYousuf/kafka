@@ -49,15 +49,7 @@ func Start() {
 
 	go consumer.GetConsumerGroupClient().Start(rootCtx, func(ctx context.Context, msg *sarama.ConsumerMessage) error {
 		// processing logic
-		logger.Logger(ctx).Info(
-			"received message",
-			zap.String("timestamp", msg.Timestamp.Local().String()),
-			zap.String("topic", msg.Topic),
-			zap.Int32("partition", msg.Partition),
-			zap.String("key", string(msg.Key)),
-			zap.Int64("offset", msg.Offset),
-			zap.String("value", string(msg.Value)),
-		)
+		logger.Logger(ctx).Info("***********************************BUSSINESS LOGIC RUNNING***********************************")
 		// simulate work
 		time.Sleep(time.Millisecond * 100)
 		return nil

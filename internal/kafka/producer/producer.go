@@ -125,7 +125,7 @@ func (p *Producer) handleErrors() {
 	for producerErr := range p.client.Errors() {
 		key, value := p.extractKeyValueFromProducerMessage(producerErr.Msg)
 		logger.Logger(nil).Error(
-			"message delivery failed",
+			"message send failure",
 			zap.String(constants.TOPIC_NAME, producerErr.Msg.Topic),
 			zap.String(constants.MSG_KEY, key),
 			zap.String(constants.MSG_VALUE, value),
@@ -136,16 +136,8 @@ func (p *Producer) handleErrors() {
 }
 
 func (p *Producer) handleSuccesses() {
-	for producerMsg := range p.client.Successes() {
-		key, value := p.extractKeyValueFromProducerMessage(producerMsg)
-		logger.Logger(nil).Info(
-			"message delivery success",
-			zap.String(constants.TOPIC_NAME, producerMsg.Topic),
-			zap.String(constants.MSG_KEY, key),
-			zap.String(constants.MSG_VALUE, value),
-			zap.Int64(constants.MSG_OFFSET, producerMsg.Offset),
-			zap.Int32(constants.MSG_PARTITION, producerMsg.Partition),
-		)
+	for _ = range p.client.Successes() {
+		logger.Logger(nil).Debug("message send successfully")
 	}
 }
 

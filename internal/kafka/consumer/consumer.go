@@ -53,7 +53,7 @@ func InitConsumer(ctx context.Context, group string, topics []string) error {
 		cfg.Consumer.Return.Errors = true
 		// If this consumer group has no saved offset, it will start reading from the latest messages
 		// sarama.OffsetNewest for real-time processing (only new data)
-		// sarama.OffsetOldest for batch/replay processing
+		// sarama.OffsetOldest for batch/replay processing: start from earliest only if no committed offsets exist
 		cfg.Consumer.Offsets.Initial = sarama.OffsetNewest
 		// Range strategy = each consumer gets a contiguous range of partitions (other values:- Round Robin, Sticky)
 		cfg.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRange()
@@ -134,6 +134,7 @@ func (c *Consumer) Start(ctx context.Context, handler func(ctx context.Context, 
 	}()
 
 	// 🟣 Start draining async internal errors
+	// catches background errors like connection drops, rebalance failures
 	go func() {
 		for err := range c.client.Errors() {
 			logger.Logger(ctx).Error("kafka.consumer: async internal error", zap.Error(err))
@@ -190,10 +191,12 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 
 		session.MarkMessage(msg, "") // mark offset committed
 		logger.Logger(ctx).Info("kafka.consumer: message processed successfully",
-			zap.String(constants.TOPIC_NAME, msg.Topic),
+			zap.String("topic", msg.Topic),
+			zap.String("timestamp", msg.Timestamp.Local().String()),
 			zap.Int32("partition", msg.Partition),
 			zap.Int64("offset", msg.Offset),
 			zap.String("key", string(msg.Key)),
+			zap.String("value", string(msg.Value)),
 			zap.Duration("processing_time", duration),
 		)
 	}
