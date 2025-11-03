@@ -97,7 +97,7 @@ func init() {
 	viper.Set("KAFKA_ADMIN_RETRY_BACKOFF", 500)
 	viper.Set("KAFKA_ADMIN_TIMEOUT", 60)
 	viper.Set("KAFKA_DISABLE_TOPIC_CREATION", false)
-	viper.Set("KAFKA_CONSUMER_GROUP_ID", "cg-1")
+	viper.Set("KAFKA_CONSUMER_GROUP_ID", "consumer-grp-1")
 	viper.Set("KAFKA_CONSUMER_TOPICS", []string{"user_created"})
 
 	viper.Set("KAFKA_USER_TOPIC", "user_created")

@@ -137,7 +137,7 @@ func (p *Producer) handleErrors() {
 
 func (p *Producer) handleSuccesses() {
 	for _ = range p.client.Successes() {
-		logger.Logger(nil).Debug("message send successfully")
+		logger.Logger(nil).Info("message send successfully :)")
 	}
 }
 

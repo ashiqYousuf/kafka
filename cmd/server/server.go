@@ -21,6 +21,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	CountMsgs = 0
+)
+
 func Start() {
 	rootCtx, cancel := context.WithCancel(logger.WithRqId(context.Background(), utils.GenReqId()))
 	defer cancel()
@@ -51,6 +55,7 @@ func Start() {
 		// processing logic
 		logger.Logger(ctx).Info("***********************************BUSSINESS LOGIC RUNNING***********************************")
 		// simulate work
+		CountMsgs++
 		time.Sleep(time.Millisecond * 100)
 		return nil
 	})
@@ -88,6 +93,11 @@ func Start() {
 	}
 
 	logger.Logger(shutdownCtx).Info("server exited cleanly")
+
+	logger.Logger(shutdownCtx).Info(
+		"total msgs consumed",
+		zap.Int("count", CountMsgs),
+	)
 }
 
 func setUpRoutes(mux *http.ServeMux) {
