@@ -70,6 +70,24 @@ services:
     networks:
       - broker-net
 
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.3
+    container_name: schema-registry
+    depends_on:
+      - broker-1
+      - broker-2
+      - broker-3
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_DEBUG: "true"
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://broker-1:29092,PLAINTEXT://broker-2:29092,PLAINTEXT://broker-3:29092"
+    networks:
+      - broker-net
+
+
 networks:
   broker-net:
     driver: bridge
