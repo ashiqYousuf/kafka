@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	KafkaConfig   *KafkaConfig
-	LogConfig     *LogConfig
-	ServiceConfig *ServiceConfig
+	KafkaConfig          *KafkaConfig
+	LogConfig            *LogConfig
+	ServiceConfig        *ServiceConfig
+	SchemaRegistryConfig *SchemaRegistryConfig
 }
 
 type ServiceConfig struct {
@@ -27,6 +28,7 @@ type KafkaConfig struct {
 	DisableTopicCreation bool
 	KafkaUserTopic       *KafkaTopic
 	KafkaConsumerConfig  *KafkaConsumerConfig
+	SchemaRegistryConfig *SchemaRegistryConfig
 }
 
 type KafkaTopic struct {
@@ -39,6 +41,10 @@ type KafkaTopic struct {
 type KafkaConsumerConfig struct {
 	GroupID string
 	Topics  []string
+}
+
+type SchemaRegistryConfig struct {
+	URL string
 }
 
 type LogConfig struct {
@@ -70,6 +76,9 @@ func GetConfig() *Config {
 				GroupID: viper.GetString("KAFKA_CONSUMER_GROUP_ID"),
 				Topics:  viper.GetStringSlice("KAFKA_CONSUMER_TOPICS"),
 			},
+		},
+		SchemaRegistryConfig: &SchemaRegistryConfig{
+			URL: viper.GetString("SCHEMA_REGISTRY_URL"),
 		},
 		LogConfig: &LogConfig{
 			LogFilePath:           viper.GetString("LOG_FILE_PATH"),
@@ -112,6 +121,8 @@ func init() {
 		constants.RETENTION_MS:                       "604800000",   // 7 days
 		constants.RETENTION_BYTES:                    "10737418240", // 10 GB per partition
 	})
+
+	viper.Set("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 
 	viper.SetDefault("LOG_FILE_PATH", "/var/log/kafka/")
 	viper.SetDefault("LOG_FILE_NAME", "app")
