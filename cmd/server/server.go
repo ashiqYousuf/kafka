@@ -15,6 +15,7 @@ import (
 	"github.com/ashiqYousuf/kafka/internal/kafka/admin"
 	"github.com/ashiqYousuf/kafka/internal/kafka/consumer"
 	"github.com/ashiqYousuf/kafka/internal/kafka/producer"
+	"github.com/ashiqYousuf/kafka/internal/kafka/schema"
 	"github.com/ashiqYousuf/kafka/pkg/constants"
 	"github.com/ashiqYousuf/kafka/pkg/logger"
 	"github.com/ashiqYousuf/kafka/pkg/utils"
@@ -38,6 +39,12 @@ func Start() {
 	if !config.GetConfig().KafkaConfig.DisableTopicCreation {
 		kafkaAdminOps(rootCtx)
 	}
+
+	schema.InitSchemaRegistryClient(
+		config.GetConfig().SchemaRegistryConfig.URL,
+		"user",
+		"pass",
+	)
 
 	if err := producer.InitProducerClient(rootCtx); err != nil {
 		logger.Logger(rootCtx).Fatal("kafka producer init error", zap.Error(err))

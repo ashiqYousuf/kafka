@@ -2,11 +2,14 @@ package producer
 
 import (
 	"context"
+	"encoding/binary"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/ashiqYousuf/kafka/internal/config"
+	"github.com/ashiqYousuf/kafka/internal/kafka/schema"
 	"github.com/ashiqYousuf/kafka/pkg/constants"
 	"github.com/ashiqYousuf/kafka/pkg/logger"
 	"go.uber.org/zap"
@@ -101,6 +104,7 @@ func SetProducerClient(mockClient IKafkaProducer) {
 	}
 }
 
+// Send is for sending the raw bytes
 func (p *Producer) Send(ctx context.Context, topic, key string, value []byte) {
 	select {
 	case p.client.Input() <- &sarama.ProducerMessage{ // async send: that operation only queues the message — not sends it to Kafka
@@ -117,6 +121,36 @@ func (p *Producer) Send(ctx context.Context, topic, key string, value []byte) {
 	}
 }
 
+// SendAvro serializes `native` using the provided Avro schema string,
+// registers or gets schema id and enqueues the resulting bytes to Sarama.
+func (p *Producer) SendAvro(ctx context.Context, topic, key string, native map[string]interface{}, schemaStr string) {
+	subject := fmt.Sprintf("%s-value", topic)
+	payload, err := schema.GetSchemaRegistryClient().AvroSerialize(subject, schemaStr, native)
+	if err != nil {
+		logger.Logger(ctx).Error("avro serialization failed", zap.Error(err),
+			zap.String(constants.TOPIC_NAME, topic),
+			zap.String(constants.MSG_KEY, key),
+		)
+		// Emit metrics or send to DLQ
+		return
+	}
+
+	// publish the serialized bytes
+	select {
+	case p.client.Input() <- &sarama.ProducerMessage{
+		Topic: topic,
+		Key:   sarama.StringEncoder(key),
+		Value: sarama.ByteEncoder(payload),
+	}:
+	case <-ctx.Done():
+		logger.Logger(ctx).Warn("context cancelled, dropping avro message",
+			zap.String(constants.TOPIC_NAME, topic),
+			zap.String(constants.MSG_KEY, key),
+			zap.Any("avro encoded value", string(payload)),
+		)
+	}
+}
+
 func (p *Producer) Close() error {
 	return p.client.Close()
 }
@@ -124,11 +158,19 @@ func (p *Producer) Close() error {
 func (p *Producer) handleErrors() {
 	for producerErr := range p.client.Errors() {
 		key, value := p.extractKeyValueFromProducerMessage(producerErr.Msg)
+		// Try extract schema id if message looks like SR wire format
+		var schemaID int
+		if producerErr.Msg != nil && len(value) > 1+schema.SchemaIDSize {
+			b := make([]byte, 4)
+			copy(b, value[1:1+schema.SchemaIDSize])
+			schemaID = int(binary.BigEndian.Uint32(b))
+		}
 		logger.Logger(nil).Error(
 			"message send failure",
 			zap.String(constants.TOPIC_NAME, producerErr.Msg.Topic),
-			zap.String(constants.MSG_KEY, key),
-			zap.String(constants.MSG_VALUE, value),
+			zap.String(constants.MSG_KEY, string(key)),
+			zap.String(constants.MSG_VALUE, string(value)),
+			zap.Int("schema_id", schemaID),
 			zap.Error(producerErr.Err),
 		)
 		// Emit metrics or use DLQ
@@ -141,16 +183,16 @@ func (p *Producer) handleSuccesses() {
 	}
 }
 
-func (p *Producer) extractKeyValueFromProducerMessage(msg *sarama.ProducerMessage) (key string, value string) {
+func (p *Producer) extractKeyValueFromProducerMessage(msg *sarama.ProducerMessage) (key []byte, value []byte) {
 	if msg.Key != nil {
 		if k, err := msg.Key.Encode(); err == nil {
-			key = string(k)
+			key = k
 		}
 	}
 
 	if msg.Value != nil {
 		if v, err := msg.Value.Encode(); err == nil {
-			value = string(v)
+			value = v
 		}
 	}
 	return

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ashiqYousuf/kafka/internal/kafka/cerrors"
+	"github.com/ashiqYousuf/kafka/pkg/logger"
 	"github.com/linkedin/goavro/v2"
 	sr "github.com/riferrei/srclient"
 )
@@ -28,28 +29,59 @@ import (
 */
 
 const (
-	magicByte    byte = 0 // byte is an alias for uint8
-	schemaIDSize      = 4
+	MagicByte    byte = 0 // byte is an alias for uint8
+	SchemaIDSize      = 4
 )
+
+var (
+	once         sync.Once
+	schemaClient *RegistryClient
+)
+
+type IRegistryClient interface {
+	GetSchema(schemaID int) (*sr.Schema, error)
+	CreateSchema(subject string, schema string, schemaType sr.SchemaType, references ...sr.Reference) (*sr.Schema, error)
+}
 
 type RegistryClient struct {
 	// client: schema regisrty client talks to the SchemaRegistry API.
-	client *sr.SchemaRegistryClient
+	// client *sr.SchemaRegistryClient
+	client IRegistryClient
+	sr.ISchemaRegistryClient
 	// cache: to store already fetched schemas (so we don’t make HTTP calls every time)
 	// whenever we get a schema by ID from the registry, we store it here for reuse
 	cache sync.Map
 }
 
-// NewRegistryClient initializes a new SR client using
+// InitSchemaRegistryClient initializes a new SR client using
 // Schema Registry url: http://localhost:8081
 // username and password for Authentication
-func NewRegistryClient(url, username, password string) *RegistryClient {
-	client := sr.NewSchemaRegistryClient(url)
-	if username != "" && password != "" {
-		client.SetCredentials(username, password)
+func InitSchemaRegistryClient(url, username, password string) {
+	once.Do(func() {
+		client := sr.NewSchemaRegistryClient(url)
+		if username != "" && password != "" {
+			client.SetCredentials(username, password)
+		}
+		schemaClient = &RegistryClient{
+			client: client,
+			cache:  sync.Map{},
+		}
+		logger.Logger(nil).Info("schema registry client initialized")
+	})
+}
+
+func GetSchemaRegistryClient() *RegistryClient {
+	if schemaClient == nil {
+		return &RegistryClient{}
 	}
-	return &RegistryClient{
-		client: client,
+	return schemaClient
+}
+
+// SetSchemaRegistryClient only used for testing
+func SetSchemaRegistryClient(mockClient IRegistryClient) {
+	schemaClient = &RegistryClient{
+		client: mockClient,
+		cache:  sync.Map{},
 	}
 }
 
@@ -88,7 +120,7 @@ func (r *RegistryClient) RegisterOrGetID(subject string, schemaStr string, schem
 	if err != nil {
 		return 0, nil
 	}
-	r.cache.Store(schema.ID, schema)
+	r.cache.Store(schema.ID(), schema)
 	return schema.ID(), nil
 }
 
@@ -124,26 +156,26 @@ func (r *RegistryClient) AvroSerialize(subject string, schemaStr string, native 
 	}
 
 	// Build final message:
-	// [ magicByte (1 byte) ][ schemaID (4 bytes) ][ Avro binary data ]
-	out := make([]byte, 1+schemaIDSize+len(binaryData))
-	out[0] = magicByte
-	binary.BigEndian.PutUint32(out[1:1+schemaIDSize], uint32(id))
-	copy(out[1+schemaIDSize:], binaryData)
+	// [ MagicByte (1 byte) ][ schemaID (4 bytes) ][ Avro binary data ]
+	out := make([]byte, 1+SchemaIDSize+len(binaryData))
+	out[0] = MagicByte
+	binary.BigEndian.PutUint32(out[1:1+SchemaIDSize], uint32(id))
+	copy(out[1+SchemaIDSize:], binaryData)
 	return out, nil
 }
 
 // AvroDeserialize: When consumer receives Kafka message bytes,
 // this function extracts schema ID and decodes data.
 func (r *RegistryClient) AvroDeserialize(msg []byte) (schemaID int, native map[string]interface{}, err error) {
-	if len(msg) < 1+schemaIDSize {
+	if len(msg) < 1+SchemaIDSize {
 		return 0, nil, cerrors.ErrMessageTooShort
 	}
 
-	if msg[0] != magicByte {
+	if msg[0] != MagicByte {
 		return 0, nil, cerrors.ErrUnknownMagicByte
 	}
 
-	id := int(binary.BigEndian.Uint32(msg[1 : 1+schemaIDSize]))
+	id := int(binary.BigEndian.Uint32(msg[1 : 1+SchemaIDSize]))
 	schema, err := r.GetSchemaByID(id)
 	if err != nil {
 		return id, nil, err
@@ -155,7 +187,7 @@ func (r *RegistryClient) AvroDeserialize(msg []byte) (schemaID int, native map[s
 	}
 
 	// Decode Avro binary → Go map.
-	nativeVal, _, err := codec.NativeFromBinary(msg[1+schemaIDSize:])
+	nativeVal, _, err := codec.NativeFromBinary(msg[1+SchemaIDSize:])
 	if err != nil {
 		return id, nil, err
 	}
