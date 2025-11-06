@@ -2,11 +2,13 @@ package consumer
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/ashiqYousuf/kafka/internal/config"
+	"github.com/ashiqYousuf/kafka/internal/kafka/schema"
 	"github.com/ashiqYousuf/kafka/pkg/constants"
 	"github.com/ashiqYousuf/kafka/pkg/logger"
 	"github.com/ashiqYousuf/kafka/pkg/utils"
@@ -173,31 +175,45 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 	// claim = the set of partitions that Kafka assigned to this consumer during the current rebalance.
 	for msg := range claim.Messages() {
 		ctx := logger.WithRqId(context.Background(), utils.GenReqId())
-		start := time.Now()
-		err := h.processMessage(ctx, msg)
-		duration := time.Since(start)
+		schemaID, native, err := schema.GetSchemaRegistryClient().AvroDeserialize(msg.Value)
+		if err != nil {
+			logger.Logger(ctx).Error("kafka.consumer: avro deserialization failed",
+				zap.String(constants.TOPIC_NAME, msg.Topic),
+				zap.Int32("partition", msg.Partition),
+				zap.Int64("offset", msg.Offset),
+				zap.String("key", string(msg.Key)),
+				zap.ByteString("value", msg.Value), // raw binary
+				zap.Int("schemaID", schemaID),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		jsonBytes, _ := json.Marshal(native)
+		msg.Value = jsonBytes
+		// Business handler
+		err = h.processMessage(ctx, msg)
 		if err != nil {
 			logger.Logger(ctx).Error("kafka.consumer: message processing failed",
 				zap.String(constants.TOPIC_NAME, msg.Topic),
 				zap.Int32("partition", msg.Partition),
 				zap.Int64("offset", msg.Offset),
 				zap.String("key", string(msg.Key)),
-				zap.ByteString("value", msg.Value),
-				zap.Duration("processing_time", duration),
+				zap.Any("value", native),
 				zap.Error(err),
 			)
 			continue
 		}
 
 		session.MarkMessage(msg, "") // mark offset committed
+
 		logger.Logger(ctx).Info("kafka.consumer: message processed successfully",
 			zap.String("topic", msg.Topic),
 			zap.String("timestamp", msg.Timestamp.Local().String()),
 			zap.Int32("partition", msg.Partition),
 			zap.Int64("offset", msg.Offset),
 			zap.String("key", string(msg.Key)),
-			zap.String("value", string(msg.Value)),
-			zap.Duration("processing_time", duration),
+			zap.Any("value", native),
 		)
 	}
 	return nil

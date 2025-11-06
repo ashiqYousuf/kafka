@@ -135,6 +135,11 @@ func (p *Producer) SendAvro(ctx context.Context, topic, key string, native map[s
 		return
 	}
 
+	logger.Logger(ctx).Info(
+		"LOGGING AVRO ENCODED PAYLOAD FOR TESTING",
+		zap.Any("payload", payload),
+	)
+
 	// publish the serialized bytes
 	select {
 	case p.client.Input() <- &sarama.ProducerMessage{

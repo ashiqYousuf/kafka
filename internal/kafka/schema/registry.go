@@ -1,6 +1,7 @@
 package schema
 
 import (
+	_ "embed"
 	"encoding/binary"
 	"sync"
 
@@ -28,6 +29,9 @@ import (
 	c. Remaining bytes Avro endcoded payload
 */
 
+//go:embed user.avsc
+var UserSchema string // makes the contents of user.avsc available as a string variable
+
 const (
 	MagicByte    byte = 0 // byte is an alias for uint8
 	SchemaIDSize      = 4
@@ -44,10 +48,9 @@ type IRegistryClient interface {
 }
 
 type RegistryClient struct {
-	// client: schema regisrty client talks to the SchemaRegistry API.
+	// client: schema registry client talks to the SchemaRegistry API.
 	// client *sr.SchemaRegistryClient
 	client IRegistryClient
-	sr.ISchemaRegistryClient
 	// cache: to store already fetched schemas (so we don’t make HTTP calls every time)
 	// whenever we get a schema by ID from the registry, we store it here for reuse
 	cache sync.Map
@@ -116,9 +119,9 @@ func (r *RegistryClient) GetSchemaByID(id int) (*sr.Schema, error) {
 //	  ]
 //	}
 func (r *RegistryClient) RegisterOrGetID(subject string, schemaStr string, schemaType sr.SchemaType) (int, error) {
-	schema, err := r.client.CreateSchema(subject, schemaStr, sr.SchemaType(schemaType.String()))
+	schema, err := r.client.CreateSchema(subject, schemaStr, schemaType)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	r.cache.Store(schema.ID(), schema)
 	return schema.ID(), nil

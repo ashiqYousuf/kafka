@@ -7,6 +7,7 @@ import (
 	"github.com/ashiqYousuf/kafka/internal/config"
 	"github.com/ashiqYousuf/kafka/internal/dal"
 	"github.com/ashiqYousuf/kafka/internal/kafka/producer"
+	"github.com/ashiqYousuf/kafka/internal/kafka/schema"
 	"github.com/ashiqYousuf/kafka/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -24,11 +25,18 @@ func CreateUser(ctx context.Context, requestBody []byte) ([]byte, error) {
 		return nil, err
 	}
 	user := dal.GetUserDao(request.Name, request.Address, request.Password)
-	producer.GetProducerClient().Send(
+	// producer.GetProducerClient().Send(
+	// 	ctx,
+	// 	config.GetConfig().KafkaConfig.KafkaUserTopic.TopicName,
+	// 	user.ID,
+	// 	user.ToBytes(),
+	// )
+	producer.GetProducerClient().SendAvro(
 		ctx,
 		config.GetConfig().KafkaConfig.KafkaUserTopic.TopicName,
 		user.ID,
-		user.ToBytes(),
+		user.ToAvroNative(),
+		schema.UserSchema,
 	)
 	return sendResponse(user), nil
 }

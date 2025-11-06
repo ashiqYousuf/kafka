@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example",
+  "fields": [
+    { "name": "id",        "type": "string" },
+    { "name": "name",      "type": "string" },
+    { "name": "address",   "type": "string" },
+    { "name": "password",  "type": "string" },
+    { "name": "createdAt", "type": "string" },
+    { "name": "updatedAt", "type": "string" }
+  ]
+}
