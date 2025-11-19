@@ -1,0 +1,40 @@
+ROUGH WORK!
+
+acks=all
+enable.idempotence=true
+retries=Integer.MAX_VALUE
+linger.ms=5
+batch.size=32768
+max.in.flight.requests.per.connection=5
+delivery.timeout.ms=300000
+
+
+
+docker exec -it cli-tools kafka-console-consumer --bootstrap-server broker-1:29092 --topic user_created --from-beginning
+
+
+USING BACKOFF PACKAGE -> IMP
+
+
+docker exec -it cli-tools kafka-consumer-groups \
+  --bootstrap-server broker-1:29092 \
+  --list
+
+docker exec -it cli-tools kafka-consumer-groups \
+  --bootstrap-server broker-1:29092 \
+  --describe --group cg-1 --members
+
+./kafka-consumer-groups.sh \
+  --bootstrap-server <bootstrap-server-url> \
+  --delete-offsets \
+  --group <my-group> \
+  --topic <topic-name>
+
+IMPORTANT:
+Note: Every time you use kafka-console-consumer, a brand new group is created.
+
+docker exec -it cli-tools kafka-consumer-groups   --bootstrap-server broker-1:29092   --describe --group consumer-grp-1
+docker exec -it cli-tools kafka-consumer-groups   --bootstrap-server broker-1:29092   --describe --group consumer-grp-1 --members
+docker exec -it cli-tools \
+  kafka-topics --bootstrap-server broker-1:29092 \
+  --describe --topic user_created
